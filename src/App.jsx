@@ -312,6 +312,47 @@ export default function App() {
           </Card>
         </header>
 
+        {/* PAID DEBTS SECTION */}
+        {paidDebts.length > 0 && (
+          <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="h-px bg-gradient-to-r from-transparent via-emerald-900 to-transparent flex-1"></div>
+              <h2 className="text-emerald-500 font-bold flex items-center gap-2 text-sm uppercase tracking-[0.2em] px-4 py-1 border border-emerald-900/50 rounded-full bg-emerald-950/30">
+                <Trophy size={16} className="text-yellow-500" />
+                Hala Zwycięstw ({paidDebts.length})
+              </h2>
+              <div className="h-px bg-gradient-to-r from-transparent via-emerald-900 to-transparent flex-1"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75 hover:opacity-100 transition-opacity">
+              {paidDebts.map((debt) => (
+                <div key={debt.id} className="group bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex items-center justify-between hover:border-emerald-900/50 hover:bg-gray-900/60 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-900/30 p-2 rounded-full text-emerald-500">
+                      <Lock size={16} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-400 line-through decoration-emerald-500/50 decoration-2 group-hover:text-gray-300">{debt.name}</h3>
+                      <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                        <CheckCircle size={10} /> Spłacono {formatPLN(debt.initial_amount)}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleUndo(debt.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Przywróć do aktywnych (jeśli pomyłka)"
+                  >
+                    <RotateCcw size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ACTIVE DEBTS SECTION */}
         <div className="space-y-4">
           <div className="flex justify-between items-end border-b border-gray-800 pb-2 mb-4">
@@ -449,47 +490,6 @@ export default function App() {
             );
           })}
         </div>
-
-        {/* PAID DEBTS SECTION */}
-        {paidDebts.length > 0 && (
-          <div className="mt-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-px bg-gradient-to-r from-transparent via-emerald-900 to-transparent flex-1"></div>
-              <h2 className="text-emerald-500 font-bold flex items-center gap-2 text-sm uppercase tracking-[0.2em] px-4 py-1 border border-emerald-900/50 rounded-full bg-emerald-950/30">
-                <Trophy size={16} className="text-yellow-500" />
-                Hala Zwycięstw ({paidDebts.length})
-              </h2>
-              <div className="h-px bg-gradient-to-r from-transparent via-emerald-900 to-transparent flex-1"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75 hover:opacity-100 transition-opacity">
-              {paidDebts.map((debt) => (
-                <div key={debt.id} className="group bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex items-center justify-between hover:border-emerald-900/50 hover:bg-gray-900/60 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-emerald-900/30 p-2 rounded-full text-emerald-500">
-                      <Lock size={16} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-400 line-through decoration-emerald-500/50 decoration-2 group-hover:text-gray-300">{debt.name}</h3>
-                      <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                        <CheckCircle size={10} /> Spłacono {formatPLN(debt.initial_amount)}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleUndo(debt.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Przywróć do aktywnych (jeśli pomyłka)"
-                  >
-                    <RotateCcw size={14} />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
       </div>
     </div>
