@@ -349,6 +349,9 @@ export default function App() {
                   ERROR: {syncError}
                 </div>
               )}
+              <Button onClick={resetAndFixData} variant="danger" size="sm" className="bg-red-600 hover:bg-red-500 text-white font-bold ml-2">
+                NAPRAW DANE
+              </Button>
             </div>
           </div>
 
