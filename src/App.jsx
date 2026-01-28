@@ -156,16 +156,6 @@ export default function App() {
     fetchData();
   }, []);
 
-  const resetAndFixData = async () => {
-    if (!confirm('To USUNIE obecne dane i wgra nową, poprawną listę z kodu. Czy na pewno?')) return;
-
-    setLoading(true);
-    if (supabase) {
-      await supabase.from('debts').delete().neq('id', 0);
-    }
-    localStorage.removeItem('tomek_debts_v1');
-    window.location.reload();
-  };
 
   // Helper to save data
   const persistDebts = async (updatedDebts) => {
@@ -349,9 +339,6 @@ export default function App() {
                   ERROR: {syncError}
                 </div>
               )}
-              <Button onClick={resetAndFixData} variant="danger" size="sm" className="bg-red-600 hover:bg-red-500 text-white font-bold ml-2">
-                NAPRAW DANE
-              </Button>
             </div>
           </div>
 
