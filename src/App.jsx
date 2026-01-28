@@ -20,9 +20,18 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+console.log('Supabase Connection:', {
+  url: supabaseUrl ? 'Set' : 'Missing',
+  key: supabaseAnonKey ? 'Set' : 'Missing'
+});
+
 let supabase = null;
-if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'YOUR_SUPABASE_URL') {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('YOUR_SUPABASE_URL')) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  } catch (e) {
+    console.error('Failed to create Supabase client:', e);
+  }
 }
 
 // --- Components ---
