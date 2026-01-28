@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { supabase } from './supabaseConfig';
 import AICoach from './components/AICoach';
+import { calculateLevel } from './utils/gameLogic';
 
 // --- Components ---
 const Card = ({ children, className = '' }) => (
@@ -410,11 +411,14 @@ export default function App() {
     );
   }
 
+  // RPG Logic
+  const rpgStats = calculateLevel(totalPaid);
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 font-sans selection:bg-emerald-500/30 pb-20">
       <div className="max-w-3xl mx-auto space-y-8">
 
-        {/* Header Dashboard */}
+        {/* Header Dashboard with RPG Profile */}
         <header className="space-y-6 pt-4">
           <div className="flex justify-between items-center">
             <div>
@@ -422,39 +426,75 @@ export default function App() {
                 Debt Crusher
               </h1>
               <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
-                <Users size={14} className="text-emerald-500" />
-                <span>{supabase ? 'Tryb online: Supabase' : 'Tryb offline: Dane lokalne'}</span>
+                <span className="bg-gradient-to-r from-yellow-600 to-yellow-400 text-black font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                  LVL {rpgStats.level}
+                </span>
+                <span className="text-yellow-500 font-bold text-xs">{rpgStats.title}</span>
               </div>
             </div>
+
+            {/* XP Bar */}
+            <div className="hidden md:block w-32">
+              <div className="flex justify-between text-[8px] uppercase font-bold text-gray-500 mb-0.5">
+                <span>XP</span>
+                <span>{rpgStats.currentXP} / {rpgStats.maxXP}</span>
+              </div>
+              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
+                <div className="h-full bg-yellow-500 transition-all duration-1000" style={{ width: `${rpgStats.progressPercent}%` }} />
+              </div>
+            </div>
+
             {showConfetti && (
               <div className="animate-bounce bg-yellow-500 text-black font-bold px-4 py-2 rounded-full shadow-lg shadow-yellow-500/50 z-50">
-                🎉 GRATULACJE!
+                🎉 CRITICAL HIT!
               </div>
             )}
           </div>
 
-          <Card className="bg-gray-800/40 p-1">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+          <Card className="bg-gray-800/40 p-1 relative overflow-hidden group">
+            {/* Boss Battle UI */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-500" />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 relative z-10">
               <div className="border-r border-gray-700/50 pr-6">
                 <div className="mb-4">
-                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Pozostało do spłaty</p>
-                  <div className="text-2xl font-mono font-bold text-white">
+                  <div className="flex justify-between items-end mb-1">
+                    <p className="text-red-500 font-bold text-xs uppercase tracking-wider flex items-center gap-1">
+                      <Zap size={12} /> BOSS HP
+                    </p>
+                    <span className="text-xs text-gray-500 font-mono">{(totalDebt / (totalDebt + totalPaid) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-white mb-2">
                     {formatPLN(totalDebt)}
                   </div>
-                </div>
-                <div className="pt-4 border-t border-gray-700/30">
-                  <p className="text-gray-500 text-[10px] uppercase mb-1">Gotówka spłacona</p>
-                  <div className="flex items-center gap-2 text-xl font-mono font-bold text-emerald-400">
-                    {formatPLN(totalPaid)}
-                    <TrendingDown size={16} />
+
+                  {/* Boss Health Bar */}
+                  <div className="h-4 bg-gray-900 rounded border border-red-900/30 overflow-hidden relative shadow-inner">
+                    <motion.div
+                      key={totalDebt}
+                      initial={{ width: '100%' }}
+                      animate={{ width: `${(totalDebt / initialTotal) * 100}%` }}
+                      transition={{ type: 'spring', stiffness: 50 }}
+                      className="h-full bg-gradient-to-r from-red-600 via-red-500 to-orange-600 absolute top-0 left-0"
+                    />
+                    {/* Shake effect overlay on hit could go here */}
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-gray-700/30">
-                  <p className="text-gray-500 text-[10px] uppercase mb-1">Dzień wolności (est.)</p>
-                  <p className="text-xl font-bold text-white flex items-center gap-2">
-                    <Calendar size={18} className="text-blue-400" />
-                    {getFreedomDate()}
-                  </p>
+
+                <div className="pt-4 border-t border-gray-700/30 flex justify-between items-center">
+                  <div>
+                    <p className="text-gray-500 text-[10px] uppercase mb-1">Zadane Obrażenia</p>
+                    <div className="flex items-center gap-2 text-xl font-mono font-bold text-emerald-400">
+                      {formatPLN(totalPaid)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gray-500 text-[10px] uppercase mb-1">Do Wolności</p>
+                    <p className="text-sm font-bold text-white flex items-center gap-1 justify-end">
+                      <Calendar size={12} className="text-blue-400" />
+                      {getFreedomDate()}
+                    </p>
+                  </div>
                 </div>
               </div>
 
