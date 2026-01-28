@@ -139,6 +139,7 @@ export default function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState(null);
   const [newDebt, setNewDebt] = useState({ name: '', initial_amount: '', current_amount: '', category: 'Prywatne', installment: '', rate: '', priority: 5, note: '' });
+  const [strategy, setStrategy] = useState('snowball'); // 'snowball' or 'avalanche'
 
   // 1. Data Loading
   useEffect(() => {
@@ -385,7 +386,16 @@ export default function App() {
 
   const activeDebts = debts
     .filter(d => parseFloat(d.current_amount) > 0)
-    .sort((a, b) => parseFloat(a.current_amount) - parseFloat(b.current_amount));
+    .sort((a, b) => {
+      if (strategy === 'snowball') {
+        return parseFloat(a.current_amount) - parseFloat(b.current_amount);
+      } else {
+        // Avalanche: highest rate first
+        const rateA = parseFloat(a.rate) || 0;
+        const rateB = parseFloat(b.rate) || 0;
+        return rateB - rateA;
+      }
+    });
 
   const paidDebts = debts
     .filter(d => parseFloat(d.current_amount) === 0)
@@ -604,35 +614,56 @@ export default function App() {
                   <Zap size={20} className="text-yellow-400 fill-yellow-400" />
                   Do spłacenia
                 </h2>
-                <Button variant="primary" size="sm" onClick={() => setIsAddModalOpen(true)}>
-                  <Plus size={16} />
-                  Dodaj Dług
-                </Button>
               </div>
 
-              <div className="flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
-                    Metoda Kuli Śnieżnej
-                  </span>
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                    syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                      'bg-gray-500/10 text-gray-500 border-gray-500/20'
-                    }`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                      syncStatus === 'offline' ? 'bg-orange-500' :
-                        'bg-gray-500'
-                      }`} />
-                    {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
-                  </div>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+                <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+                  <button
+                    onClick={() => setStrategy('snowball')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${strategy === 'snowball' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                  >
+                    Kula Śnieżna
+                  </button>
+                  <button
+                    onClick={() => setStrategy('avalanche')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${strategy === 'avalanche' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                  >
+                    Lawina
+                  </button>
+                </div>
 
-                  {syncStatus === 'offline' && syncError && (
-                    <div className="text-[10px] text-red-500 font-medium ml-2 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 max-w-[200px] truncate">
-                      ERROR: {syncError}
-                    </div>
-                  )}
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                  syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                  }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                    syncStatus === 'offline' ? 'bg-orange-500' :
+                      'bg-gray-500'
+                    }`} />
+                  {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
                 </div>
               </div>
+
+              {/* Strategy Info Box */}
+              <motion.div
+                key={strategy}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-3 rounded-lg border ${strategy === 'snowball' ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-blue-500/5 border-blue-500/10'}`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {strategy === 'snowball' ? <Trophy size={14} className="text-emerald-500" /> : <Zap size={14} className="text-blue-500" />}
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300">
+                    {strategy === 'snowball' ? 'Skupienie na zwycięstwach' : 'Skupienie na matematyce'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  {strategy === 'snowball'
+                    ? "Spłacasz najpierw najmniejsze kwoty. To daje szybkie poczucie sukcesu i motywację do dalszej walki. Idealne, by nie stracić zapału!"
+                    : "Spłacasz najpierw długi z najwyższym procentem. Matematycznie najszybsza droga do wolności, oszczędzająca najwięcej na odsetkach."
+                  }
+                </p>
+              </motion.div>
             </div>
           </div>
 
@@ -650,7 +681,7 @@ export default function App() {
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
                   <Card
-                    className={`transition-all duration-300 hover:shadow-xl hover:shadow-black/50 ${isTopPriority ? 'ring-1 ring-emerald-500/50 bg-gray-800' : 'bg-gray-800/80 hover:bg-gray-800'}`}
+                    className={`transition-all duration-300 hover:shadow-xl hover:shadow-black/50 ${isTopPriority ? (strategy === 'snowball' ? 'ring-1 ring-emerald-500/50 bg-gray-800' : 'ring-1 ring-blue-500/50 bg-gray-800') : 'bg-gray-800/80 hover:bg-gray-800'}`}
                   >
                     <div className="p-5">
                       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
@@ -669,8 +700,8 @@ export default function App() {
                               {debt.name}
                             </h3>
                             {isTopPriority && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wide animate-pulse">
-                                Priorytet
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wide animate-pulse ${strategy === 'snowball' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>
+                                Cel: {strategy === 'snowball' ? 'Najmniejszy' : 'Najdroższy'}
                               </span>
                             )}
                             <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600">
@@ -699,7 +730,13 @@ export default function App() {
                       </div>
 
                       <div className="space-y-3">
-                        <ProgressBar current={debt.current_amount} total={debt.initial_amount} colorClass={isTopPriority ? "bg-gradient-to-r from-red-500 to-orange-500" : "bg-emerald-600"} />
+                        <ProgressBar
+                          current={debt.current_amount}
+                          total={debt.initial_amount}
+                          colorClass={isTopPriority
+                            ? (strategy === 'snowball' ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-blue-500 to-blue-400")
+                            : "bg-gray-600"}
+                        />
 
                         <div className="flex justify-between items-center pt-2">
                           <button
@@ -736,12 +773,12 @@ export default function App() {
                                 setEditingId(debt.id);
                                 setPayAmount('');
                               }}
-                              variant={isTopPriority ? "primary" : "secondary"}
+                              variant={isTopPriority ? (strategy === 'snowball' ? "primary" : "secondary") : "ghost"}
                               size="sm"
-                              className="w-full md:w-auto"
+                              className={`w-full md:w-auto ${isTopPriority && strategy === 'avalanche' ? 'bg-blue-600 hover:bg-blue-500 text-white border-none' : ''}`}
                             >
                               <ArrowUpRight size={16} />
-                              {isTopPriority ? "Atakuj ten dług!" : "Dodaj wpłatę"}
+                              {isTopPriority ? (strategy === 'snowball' ? "Atakuj (Kula Śnieżna)!" : "Atakuj (Lawina)!") : "Dodaj wpłatę"}
                             </Button>
                           )}
                         </div>
