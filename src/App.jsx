@@ -331,10 +331,18 @@ export default function App() {
           <Card className="bg-gray-800/40 p-1">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
               <div className="border-r border-gray-700/50 pr-6">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">Gotówka spłacona</p>
-                <div className="flex items-center gap-3 text-3xl font-mono font-bold text-emerald-400">
-                  {formatPLN(totalPaid)}
-                  <TrendingDown size={20} />
+                <div className="mb-4">
+                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Pozostało do spłaty</p>
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {formatPLN(totalDebt)}
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-gray-700/30">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Gotówka spłacona</p>
+                  <div className="flex items-center gap-2 text-xl font-mono font-bold text-emerald-400">
+                    {formatPLN(totalPaid)}
+                    <TrendingDown size={16} />
+                  </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-700/30">
                   <p className="text-gray-500 text-[10px] uppercase mb-1">Dzień wolności (est.)</p>
