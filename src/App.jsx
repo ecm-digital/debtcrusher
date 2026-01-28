@@ -20,18 +20,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('Supabase Connection:', {
-  url: supabaseUrl ? 'Set' : 'Missing',
-  key: supabaseAnonKey ? 'Set' : 'Missing'
-});
-
 let supabase = null;
-if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('YOUR_SUPABASE_URL')) {
-  try {
+try {
+  if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('YOUR_SUPABASE_URL')) {
     supabase = createClient(supabaseUrl, supabaseAnonKey);
-  } catch (e) {
-    console.error('Failed to create Supabase client:', e);
   }
+} catch (e) {
+  console.error('Supabase init error:', e);
 }
 
 // --- Components ---
@@ -344,7 +339,7 @@ export default function App() {
 
           {!supabase && (
             <div className="text-xs text-yellow-500 bg-yellow-950/20 p-2 rounded border border-yellow-900/30 mb-4">
-              Uwaga: Brak konfiguracji Supabase. Ustaw VITE_SUPABASE_URL i VITE_SUPABASE_ANON_KEY w .env.
+              Uwaga: Tryb offline. Skonfiguruj VITE_SUPABASE_URL w .env, aby włączyć synchronizację.
             </div>
           )}
 
