@@ -40,6 +40,8 @@ import TrendsChart from './components/TrendsChart';
 import PiggyBank from './components/PiggyBank';
 import ScheduleSimulation from './components/ScheduleSimulation';
 import { checkAchievements } from './utils/achievements';
+import { generateContract } from './utils/contractGenerator';
+import { FileSignature } from 'lucide-react';
 
 // --- Components ---
 const Card = ({ children, className = '' }) => (
@@ -447,13 +449,18 @@ export default function App() {
     }
   };
 
+  const handleSignContract = () => {
+    generateContract(activeDebts, totalDebt, getFreedomDate(), strategy);
+    toast.success("Twój Pakt Wolności został wygenerowany! 📜");
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 font-sans selection:bg-emerald-500/30 pb-20">
       <div className="max-w-3xl mx-auto space-y-8">
 
         {/* Header Dashboard with RPG Profile */}
         <header className="space-y-6 pt-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
                 Debt Crusher
@@ -466,15 +473,27 @@ export default function App() {
               </div>
             </div>
 
-            {/* XP Bar */}
-            <div className="hidden md:block w-32">
-              <div className="flex justify-between text-[8px] uppercase font-bold text-gray-500 mb-0.5">
-                <span>XP</span>
-                <span>{rpgStats.currentXP} / {rpgStats.maxXP}</span>
+            {/* XP Bar & Actions */}
+            <div className="flex items-center gap-4">
+              <div className="hidden md:block w-32">
+                <div className="flex justify-between text-[8px] uppercase font-bold text-gray-500 mb-0.5">
+                  <span>XP</span>
+                  <span>{rpgStats.currentXP} / {rpgStats.maxXP}</span>
+                </div>
+                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
+                  <div className="h-full bg-yellow-500 transition-all duration-1000" style={{ width: `${rpgStats.progressPercent}%` }} />
+                </div>
               </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
-                <div className="h-full bg-yellow-500 transition-all duration-1000" style={{ width: `${rpgStats.progressPercent}%` }} />
-              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSignContract}
+                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+              >
+                <FileSignature size={14} />
+                <span className="hidden sm:inline">Podpisz Pakt</span>
+              </Button>
             </div>
 
             {showConfetti && (
