@@ -128,10 +128,15 @@ export default function App() {
 
   // 1. Auth Setup
   useEffect(() => {
+    const loadLocalData = () => {
+      const localData = localStorage.getItem('tomek_debts_v1');
+      setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
+    };
+
     if (!auth) {
-      // If Firebase failed to init, we just use dummy data
+      // If Firebase failed to init, we just use local data
       setLoading(false);
-      setDebts(INITIAL_DEBTS);
+      loadLocalData();
       return;
     }
 
@@ -144,9 +149,9 @@ export default function App() {
         }
       } catch (error) {
         console.error("Auth error:", error);
-        // Fallback to local data if auth fails (e.g. no internet or bad config)
+        // Fallback to local data if auth fails
         setLoading(false);
-        setDebts(INITIAL_DEBTS);
+        loadLocalData();
       }
     };
     initAuth();
@@ -159,7 +164,6 @@ export default function App() {
     if (!user || !db) return;
 
     // Use a specific document for this app instance to share data
-    // Path: artifacts/{appId}/public/data/financials/debts
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'financials', 'debts');
 
     const unsubscribe = onSnapshot(docRef, async (snapshot) => {
@@ -168,6 +172,8 @@ export default function App() {
         const data = snapshot.data();
         if (data && data.items) {
           setDebts(data.items);
+          // Sync back to local storage
+          localStorage.setItem('tomek_debts_v1', JSON.stringify(data.items));
         }
       } else {
         // First time load: Check if we have local data to migrate
@@ -186,7 +192,8 @@ export default function App() {
       console.error("Firestore error:", error);
       setLoading(false);
       // Fallback to local
-      setDebts(INITIAL_DEBTS);
+      const localData = localStorage.getItem('tomek_debts_v1');
+      if (localData) setDebts(JSON.parse(localData));
     });
 
     return () => unsubscribe();
