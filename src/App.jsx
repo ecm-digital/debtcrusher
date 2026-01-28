@@ -35,6 +35,10 @@ import {
 import { supabase } from './supabaseConfig';
 import AICoach from './components/AICoach';
 import { calculateLevel } from './utils/gameLogic';
+import TrophyRoom from './components/TrophyRoom';
+import TrendsChart from './components/TrendsChart';
+import PiggyBank from './components/PiggyBank';
+import { checkAchievements } from './utils/achievements';
 
 // --- Components ---
 const Card = ({ children, className = '' }) => (
@@ -414,6 +418,34 @@ export default function App() {
   // RPG Logic
   const rpgStats = calculateLevel(totalPaid);
 
+  // Achievements Logic
+  const unlockedBadges = checkAchievements(payments, debts, totalDebt);
+
+  // Piggy Bank Handler
+  const handleSmashPiggyBank = (amount) => {
+    setPayAmount(amount.toString());
+
+    // Find highest interest debt for Avalanche or smallest debt for Snowball to suggest
+    let suggestedDebtId = null;
+    if (activeDebts.length > 0) {
+      // Just pick the first one as it is already sorted by strategy
+      suggestedDebtId = activeDebts[0].id;
+    }
+
+    if (suggestedDebtId) {
+      setEditingId(suggestedDebtId);
+      setIsEditModalOpen(true); // Re-using edit modal logic roughly, or maybe we open the quick pay logic?
+      // Actually the 'quick pay' is inline in the card. 
+      // We'll mimic clicking "Atakuj" on the top priority debt.
+      setEditingId(suggestedDebtId);
+      setPayAmount(amount.toString());
+      // We need to scroll to it or open modal? 
+      // The existing logic uses `editingId` to show inline input in the card.
+    } else {
+      toast.error("Brak aktywnych długów do spłacenia!");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 font-sans selection:bg-emerald-500/30 pb-20">
       <div className="max-w-3xl mx-auto space-y-8">
@@ -540,7 +572,16 @@ export default function App() {
           </Card>
         </header>
 
-        {/* ANALYTICS & HISTORY ROW */}
+        {/* ULTIMATE CRUSHER TOOLS ROW */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TrophyRoom unlockedBadges={unlockedBadges} />
+          <div className="space-y-4">
+            <PiggyBank onSmash={handleSmashPiggyBank} />
+            <TrendsChart history={payments} totalDebt={totalDebt} totalPaid={totalPaid} />
+          </div>
+        </div>
+
+        {/* ANALITYKA I HISTORIA ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="bg-gray-800/30 p-5">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
