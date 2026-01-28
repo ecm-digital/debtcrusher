@@ -80,17 +80,17 @@ const ProgressBar = ({ current, total, colorClass = "bg-emerald-500" }) => {
 
 // Initial data - Real User Debts
 const INITIAL_DEBTS = [
-  { name: 'Vivigo', category: 'Chwilówka', initial_amount: 1458.60, current_amount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI (Mała kwota, zamknij to natychmiast)' },
-  { name: 'Santander', category: 'Prywatne', initial_amount: 2092.01, current_amount: 2092.01, rate: '?', priority: 2, note: 'WYSOKI (Łatwe do spłaty, uwalnia zdolność)' },
-  { name: 'Net Credit', category: 'Chwilówka', initial_amount: 4704.50, current_amount: 4704.50, rate: '?', priority: 3, note: 'WYSOKI (Prawdopodobnie wysokie koszty ukryte)' },
-  { name: 'Wonga', category: 'Pożyczka', initial_amount: 8153.46, current_amount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'WYSOKI (Ogromna rata w stosunku do długu!)' },
-  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 9245.08, current_amount: 9245.08, rate: '15%', priority: 5, note: 'ŚREDNI (Wysoki %, ale bankowy)' },
-  { name: 'Smartkey', category: 'Pożyczka', initial_amount: 12070.71, current_amount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: 'ŚREDNI' },
-  { name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 15200.00, current_amount: 15200.00, rate: '12.10%', priority: 7, note: 'ŚREDNI (Pętla zadłużenia, spłacaj nadwyżkami)' },
-  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18191.51, current_amount: 18191.51, rate: '12.7%', priority: 8, note: 'ŚREDNI' },
-  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18400.00, current_amount: 18400.00, rate: '10.7%', priority: 9, note: 'NISKI (Najniższy %, zostaw na koniec)' },
-  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 23072.72, current_amount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'NISKI (Stabilna rata)' },
-  { name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 50119.53, current_amount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'NISKI (Długi termin, niska rata)' },
+  { id: 1, name: 'Vivigo', category: 'Chwilówka', initial_amount: 1458.60, current_amount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI (Mała kwota, zamknij to natychmiast)' },
+  { id: 2, name: 'Santander', category: 'Prywatne', initial_amount: 2092.01, current_amount: 2092.01, rate: '?', priority: 2, note: 'WYSOKI (Łatwe do spłaty, uwalnia zdolność)' },
+  { id: 3, name: 'Net Credit', category: 'Chwilówka', initial_amount: 4704.50, current_amount: 4704.50, rate: '?', priority: 3, note: 'WYSOKI (Prawdopodobnie wysokie koszty ukryte)' },
+  { id: 4, name: 'Wonga', category: 'Pożyczka', initial_amount: 8153.46, current_amount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'WYSOKI (Ogromna rata w stosunku do długu!)' },
+  { id: 5, name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 9245.08, current_amount: 9245.08, rate: '15%', priority: 5, note: 'ŚREDNI (Wysoki %, ale bankowy)' },
+  { id: 6, name: 'Smartkey', category: 'Pożyczka', initial_amount: 12070.71, current_amount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: 'ŚREDNI' },
+  { id: 7, name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 15200.00, current_amount: 15200.00, rate: '12.10%', priority: 7, note: 'ŚREDNI (Pętla zadłużenia, spłacaj nadwyżkami)' },
+  { id: 8, name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18191.51, current_amount: 18191.51, rate: '12.7%', priority: 8, note: 'ŚREDNI' },
+  { id: 9, name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18400.00, current_amount: 18400.00, rate: '10.7%', priority: 9, note: 'NISKI (Najniższy %, zostaw na koniec)' },
+  { id: 10, name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 23072.72, current_amount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'NISKI (Stabilna rata)' },
+  { id: 11, name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 50119.53, current_amount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'NISKI (Długi termin, niska rata)' },
 ];
 
 export default function App() {
@@ -127,9 +127,12 @@ export default function App() {
           } else {
             // If Supabase is empty, check if we have something in INITIAL_DEBTS to seed
             console.log('Supabase is empty, seeding your real data...');
+            // Remove local IDs to let Supabase generate its own bigint IDs
+            const dataToInsert = INITIAL_DEBTS.map(({ id, ...rest }) => rest);
+
             const { data: inserted, error: insertError } = await supabase
               .from('debts')
-              .insert(INITIAL_DEBTS)
+              .insert(dataToInsert)
               .select();
 
             if (insertError) {
@@ -502,7 +505,7 @@ export default function App() {
                         <RotateCcw size={14} className="rotate-45" />
                       </button>
 
-                      {editingId === debt.id ? (
+                      {editingId && editingId === debt.id ? (
                         <div className="flex gap-2 items-center w-full md:w-auto bg-gray-900/90 p-1.5 rounded-lg border border-gray-600 animate-in fade-in slide-in-from-right-4 shadow-xl">
                           <input
                             type="number"
