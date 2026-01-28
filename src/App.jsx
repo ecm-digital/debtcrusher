@@ -332,8 +332,8 @@ export default function App() {
                 Metoda Kuli Śnieżnej
               </span>
               <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                  syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                  'bg-gray-500/10 text-gray-500 border-gray-500/20'
                 }`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
                     syncStatus === 'offline' ? 'bg-orange-500' :
@@ -341,6 +341,12 @@ export default function App() {
                   }`} />
                 {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
               </div>
+
+              {syncStatus === 'offline' && (
+                <div className="text-[10px] text-orange-400 opacity-50 ml-2">
+                  DEBUG: {supabaseUrl ? 'URL OK' : 'URL MISSING'} | {supabaseAnonKey ? 'KEY OK' : 'KEY MISSING'}
+                </div>
+              )}
             </div>
           </div>
 
