@@ -106,8 +106,8 @@ export default function App() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      console.log('Loading data...');
 
-      // Try Supabase first
       if (supabase) {
         try {
           const { data, error } = await supabase
@@ -115,24 +115,53 @@ export default function App() {
             .select('*')
             .order('priority', { ascending: true });
 
-          if (error) throw error;
+          if (error) {
+            console.error("Supabase select error:", error);
+            throw error;
+          }
 
           if (data && data.length > 0) {
+            console.log('Data loaded from Supabase:', data.length, 'records');
             setDebts(data);
             localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
             setLoading(false);
             return;
+          } else {
+            // Database is empty - let's seed it with initial data
+            console.log('Supabase is empty, seeding initial data...');
+            const localData = localStorage.getItem('tomek_debts_v1');
+            const initialToSeed = localData ? JSON.parse(localData) : INITIAL_DEBTS;
+
+            // Remove local IDs to let Supabase generate its own bigint IDs
+            const dataToInsert = initialToSeed.map(({ id, ...rest }) => rest);
+
+            const { data: inserted, error: insertError } = await supabase
+              .from('debts')
+              .insert(dataToInsert)
+              .select();
+
+            if (insertError) {
+              console.error("Seeding error:", insertError);
+            } else if (inserted) {
+              console.log('Seeded successfully:', inserted.length, 'records');
+              setDebts(inserted);
+              localStorage.setItem('tomek_debts_v1', JSON.stringify(inserted));
+              setLoading(false);
+              return;
+            }
           }
         } catch (e) {
-          console.error("Supabase error:", e);
+          console.error("Supabase operation failed:", e);
         }
       }
 
-      // Fallback to localStorage
+      // Fallback to localStorage if Supabase failed or isn't configured
       const localData = localStorage.getItem('tomek_debts_v1');
       if (localData) {
+        console.log('Loading from localStorage');
         setDebts(JSON.parse(localData));
       } else {
+        console.log('Loading initial defaults');
         setDebts(INITIAL_DEBTS);
       }
       setLoading(false);
