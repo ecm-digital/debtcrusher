@@ -38,6 +38,7 @@ import { calculateLevel } from './utils/gameLogic';
 import TrophyRoom from './components/TrophyRoom';
 import TrendsChart from './components/TrendsChart';
 import PiggyBank from './components/PiggyBank';
+import ScheduleSimulation from './components/ScheduleSimulation';
 import { checkAchievements } from './utils/achievements';
 
 // --- Components ---
@@ -577,7 +578,10 @@ export default function App() {
           <TrophyRoom unlockedBadges={unlockedBadges} />
           <div className="space-y-4">
             <PiggyBank onSmash={handleSmashPiggyBank} />
-            <TrendsChart history={payments} totalDebt={totalDebt} totalPaid={totalPaid} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <TrendsChart history={payments} totalDebt={totalDebt} totalPaid={totalPaid} />
+              <ScheduleSimulation totalDebt={totalDebt} monthlyInstallments={monthlyInstallments} initialTotalDebt={initialTotal} />
+            </div>
           </div>
         </div>
 
