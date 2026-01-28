@@ -33,7 +33,7 @@ import {
   YAxis
 } from 'recharts';
 import { supabase } from './supabaseConfig';
-
+import AICoach from './components/AICoach';
 
 // --- Components ---
 const Card = ({ children, className = '' }) => (
@@ -937,6 +937,7 @@ export default function App() {
       </Modal>
 
       <Toaster position="bottom-right" theme="dark" richColors />
-    </div>
+      <AICoach context={{ totalDebt, totalPaid, strategy, monthlyInstallments, monthsToFreedom }} />
+    </div >
   );
 }
