@@ -12,8 +12,22 @@ import {
   RotateCcw,
   Lock,
   Loader2,
-  Users
+  Users,
+  Calendar,
+  History,
+  PieChart as PieChartIcon
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as ReTooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis
+} from 'recharts';
 import { supabase } from './supabaseConfig';
 
 
@@ -89,37 +103,36 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [syncStatus, setSyncStatus] = useState('checking'); // 'checking', 'connected', 'offline'
   const [syncError, setSyncError] = useState(null);
+  const [payments, setPayments] = useState([]);
 
   // 1. Data Loading
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      console.log('Loading data...');
-
       if (supabase) {
         try {
-          const { data, error } = await supabase
+          const { data: debtData, error: debtError } = await supabase
             .from('debts')
             .select('*')
             .order('priority', { ascending: true });
 
-          if (error) {
-            console.error("Supabase select error:", error);
-            throw error;
-          }
+          const { data: paymentData, error: paymentError } = await supabase
+            .from('payments')
+            .select('*, debts(name)')
+            .order('created_at', { descending: true })
+            .limit(10);
 
-          if (data && data.length > 0) {
-            console.log('Data loaded from Supabase:', data.length, 'records');
-            setDebts(data);
-            localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
+          if (debtError) throw debtError;
+          if (paymentError) console.error("History fetch error:", paymentError);
+
+          if (debtData && debtData.length > 0) {
+            setDebts(debtData);
+            localStorage.setItem('tomek_debts_v1', JSON.stringify(debtData));
             setSyncStatus('connected');
           } else {
-            // If Supabase is empty, check if we have something in localStorage to seed first
+            // Seeding logic...
             const localData = localStorage.getItem('tomek_debts_v1');
             const dataToSeed = localData ? JSON.parse(localData) : INITIAL_DEBTS;
-
-            console.log('Supabase is empty, seeding your data...');
-            // Remove local IDs to let Supabase generate its own bigint IDs
             const dataToInsert = dataToSeed.map(({ id, ...rest }) => rest);
 
             const { data: inserted, error: insertError } = await supabase
@@ -128,20 +141,19 @@ export default function App() {
               .select();
 
             if (insertError) {
-              console.error("Seeding error:", insertError);
-              setSyncError(`Błąd wgrywania danych: ${insertError.message}`);
+              setSyncError(`Błąd wgrywania: ${insertError.message}`);
               setDebts(dataToSeed);
             } else if (inserted) {
-              console.log('Seeded successfully with your data');
               setDebts(inserted);
               localStorage.setItem('tomek_debts_v1', JSON.stringify(inserted));
               setSyncStatus('connected');
             }
           }
+          if (paymentData) setPayments(paymentData);
         } catch (e) {
-          console.error("Supabase operation failed:", e);
+          console.error("Supabase fail:", e);
           setSyncStatus('offline');
-          setSyncError(e.message || "Błąd połączenia z Supabase");
+          setSyncError(e.message);
           const localData = localStorage.getItem('tomek_debts_v1');
           setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
         }
@@ -186,7 +198,19 @@ export default function App() {
         console.error("Supabase Update Error:", error);
         alert(`Błąd zapisu w chmurze: ${error.message}`);
       } else {
-        console.log("Supabase update success:", data);
+        // Record payment in history
+        await supabase.from('payments').insert({
+          debt_id: id,
+          amount: amount
+        });
+
+        // Refresh payments list
+        const { data: pData } = await supabase
+          .from('payments')
+          .select('*, debts(name)')
+          .order('created_at', { descending: true })
+          .limit(10);
+        if (pData) setPayments(pData);
       }
     } else {
       console.log("Supabase not active, saved only locally.");
@@ -248,6 +272,22 @@ export default function App() {
   const totalPaid = initialTotal - totalDebt;
   const percentPaid = initialTotal > 0 ? ((totalPaid / initialTotal) * 100).toFixed(1) : "0.0";
 
+  // Freedom Date Calculation
+  const monthlyInstallments = debts.reduce((acc, curr) => acc + (parseFloat(curr.installment) || 0), 0);
+  const monthsToFreedom = monthlyInstallments > 0 ? Math.ceil(totalDebt / monthlyInstallments) : 0;
+
+  const getFreedomDate = () => {
+    if (monthsToFreedom === 0) return "Już wolny!";
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthsToFreedom);
+    return d.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+  };
+
+  const chartData = [
+    { name: 'Pozostało', value: totalDebt, color: '#111827' },
+    { name: 'Spłacono', value: totalPaid, color: '#10b981' },
+  ];
+
   const activeDebts = debts
     .filter(d => parseFloat(d.current_amount) > 0)
     .sort((a, b) => parseFloat(a.current_amount) - parseFloat(b.current_amount));
@@ -288,29 +328,119 @@ export default function App() {
             )}
           </div>
 
-          <Card className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center md:text-left">
-              <div>
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Pozostało do spłaty</p>
-                <div className="text-3xl font-bold text-white">{formatPLN(totalDebt)}</div>
-              </div>
-              <div>
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Już spłacono</p>
-                <div className="text-3xl font-bold text-emerald-400 flex items-center justify-center md:justify-start gap-2">
+          <Card className="bg-gray-800/40 p-1">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+              <div className="border-r border-gray-700/50 pr-6">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">Gotówka spłacona</p>
+                <div className="flex items-center gap-3 text-3xl font-mono font-bold text-emerald-400">
                   {formatPLN(totalPaid)}
                   <TrendingDown size={20} />
                 </div>
+                <div className="mt-4 pt-4 border-t border-gray-700/30">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Dzień wolności (est.)</p>
+                  <p className="text-xl font-bold text-white flex items-center gap-2">
+                    <Calendar size={18} className="text-blue-400" />
+                    {getFreedomDate()}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Postęp całkowity</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-blue-400">{percentPaid}%</span>
+
+              <div className="border-r border-gray-700/50 pr-6 flex flex-col justify-center">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1 text-center">Struktura Zadłużenia</p>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        innerRadius={35}
+                        outerRadius={50}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                        ))}
+                      </Pie>
+                      <ReTooltip
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff' }}
+                        formatter={(value) => formatPLN(value)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-4 text-[10px] uppercase">
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Spłacono</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-gray-900" /> Pozostało</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-center">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">Cel Główny: 100% WOLNOŚCI</p>
+                <div className="flex items-end gap-2 mb-2">
+                  <span className="text-5xl font-black text-blue-400 tracking-tighter">{percentPaid}%</span>
+                  <span className="text-gray-500 text-sm mb-2 font-mono">UKOŃCZONE</span>
                 </div>
                 <ProgressBar current={totalDebt} total={initialTotal} colorClass="bg-gradient-to-r from-emerald-500 to-blue-500" />
               </div>
             </div>
           </Card>
         </header>
+
+        {/* ANALYTICS & HISTORY ROW */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-gray-800/30 p-5">
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <History size={16} className="text-emerald-500" />
+              Ostatnie Sukcesy
+            </h3>
+            <div className="space-y-3">
+              {payments.length === 0 ? (
+                <p className="text-gray-600 text-sm italic py-4 text-center">Brak historii wpłat...</p>
+              ) : (
+                payments.map(p => (
+                  <div key={p.id} className="flex items-center justify-between p-2 rounded bg-black/20 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                        <ArrowUpRight size={14} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-300">{p.debts?.name || 'Dług'}</p>
+                        <p className="text-[10px] text-gray-500">{new Date(p.created_at).toLocaleString('pl-PL')}</p>
+                      </div>
+                    </div>
+                    <div className="text-emerald-400 font-mono text-sm font-bold">
+                      +{formatPLN(p.amount)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+
+          <Card className="bg-gray-800/30 p-5">
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <PieChartIcon size={16} className="text-blue-500" />
+              Twoja Strategia
+            </h3>
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                <p className="text-[10px] text-emerald-500 uppercase font-bold mb-1">Obecna amunicja miesięczna</p>
+                <p className="text-2xl font-mono font-bold text-white">{formatPLN(monthlyInstallments)}</p>
+                <p className="text-xs text-gray-500 mt-1">To suma wszystkich Twoich obecnych rat.</p>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                <p className="text-[10px] text-blue-500 uppercase font-bold mb-1">Moc Nadpłaty</p>
+                <p className="text-sm text-gray-300">
+                  Każde dodatkowe <span className="text-white font-bold">100 zł</span> miesięcznie przyśpieszy Twoją wolność o ok.
+                  <span className="text-blue-400 font-bold ml-1">
+                    {totalDebt > 0 ? (monthsToFreedom - Math.ceil(totalDebt / (monthlyInstallments + 100))) : 0} msc
+                  </span>.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* PAID DEBTS SECTION */}
         {paidDebts.length > 0 && (
