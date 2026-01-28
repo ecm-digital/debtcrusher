@@ -15,8 +15,12 @@ import {
   Users,
   Calendar,
   History,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Plus,
+  Edit2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Toaster, toast } from 'sonner';
 import {
   PieChart,
   Pie,
@@ -65,6 +69,33 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
   );
 };
 
+const Modal = ({ isOpen, onClose, title, children }) => (
+  <AnimatePresence>
+    {isOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
+        >
+          <div className="p-6">
+            <h3 className="text-xl font-bold text-white mb-6">{title}</h3>
+            {children}
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
+);
+
 const ProgressBar = ({ current, total, colorClass = "bg-emerald-500" }) => {
   const percentage = Math.min(100, Math.max(0, ((total - current) / total) * 100));
 
@@ -104,6 +135,10 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('checking'); // 'checking', 'connected', 'offline'
   const [syncError, setSyncError] = useState(null);
   const [payments, setPayments] = useState([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [newDebt, setNewDebt] = useState({ name: '', initial_amount: '', current_amount: '', category: 'Prywatne', installment: '', rate: '', priority: 5, note: '' });
 
   // 1. Data Loading
   useEffect(() => {
@@ -175,6 +210,69 @@ export default function App() {
     localStorage.setItem('tomek_debts_v1', JSON.stringify(updatedDebts));
   };
 
+  // Management Functions
+  const handleSaveNewDebt = async () => {
+    if (!newDebt.name || !newDebt.initial_amount) {
+      toast.error("Podaj nazwę i kwotę początkową!");
+      return;
+    }
+
+    const debtToSave = {
+      ...newDebt,
+      initial_amount: parseFloat(newDebt.initial_amount),
+      current_amount: parseFloat(newDebt.current_amount || newDebt.initial_amount),
+      installment: newDebt.installment ? parseFloat(newDebt.installment) : null,
+      priority: parseInt(newDebt.priority)
+    };
+
+    if (supabase) {
+      const { data, error } = await supabase.from('debts').insert(debtToSave).select();
+      if (error) {
+        toast.error(`Błąd: ${error.message}`);
+      } else if (data) {
+        const updatedDebts = [...debts, data[0]];
+        persistDebts(updatedDebts);
+        toast.success("Dług dodany pomyślnie!");
+        setIsAddModalOpen(false);
+        setNewDebt({ name: '', initial_amount: '', current_amount: '', category: 'Prywatne', installment: '', rate: '', priority: 5, note: '' });
+      }
+    } else {
+      const updatedDebts = [...debts, { ...debtToSave, id: Date.now() }];
+      persistDebts(updatedDebts);
+      toast.success("Dług dodany lokalnie!");
+      setIsAddModalOpen(false);
+    }
+  };
+
+  const handleUpdateDebtDetails = async () => {
+    if (!editingDebt) return;
+
+    const updatedData = {
+      ...editingDebt,
+      initial_amount: parseFloat(editingDebt.initial_amount),
+      current_amount: parseFloat(editingDebt.current_amount),
+      installment: editingDebt.installment ? parseFloat(editingDebt.installment) : null,
+      priority: parseInt(editingDebt.priority)
+    };
+
+    if (supabase) {
+      const { error } = await supabase.from('debts').update(updatedData).eq('id', editingDebt.id);
+      if (error) {
+        toast.error(`Błąd: ${error.message}`);
+      } else {
+        const updatedDebts = debts.map(d => d.id === editingDebt.id ? updatedData : d);
+        persistDebts(updatedDebts);
+        toast.success("Dług zaktualizowany!");
+        setIsEditModalOpen(false);
+      }
+    } else {
+      const updatedDebts = debts.map(d => d.id === editingDebt.id ? updatedData : d);
+      persistDebts(updatedDebts);
+      toast.success("Zaktualizowano lokalnie!");
+      setIsEditModalOpen(false);
+    }
+  };
+
   const handlePayment = async (id) => {
     if (!payAmount) return;
     const amount = parseFloat(payAmount.replace(',', '.'));
@@ -184,36 +282,23 @@ export default function App() {
     if (!debt) return;
 
     const newAmount = Math.max(0, debt.current_amount - amount);
-    if (newAmount === 0) triggerSuccess();
+    if (newAmount === 0) {
+      triggerSuccess();
+      toast.success(`Wspaniale! Dług ${debt.name} został całkowicie spłacony! 🏆`);
+    } else {
+      toast.success(`Zaksięgowano wpłatę ${formatPLN(amount)} na poczet ${debt.name}`);
+    }
 
     if (supabase) {
-      console.log(`Sending update to Supabase for ID: ${id}, New Amount: ${newAmount}`);
-      const { error, data } = await supabase
-        .from('debts')
-        .update({ current_amount: newAmount })
-        .eq('id', id)
-        .select();
-
+      const { error } = await supabase.from('debts').update({ current_amount: newAmount }).eq('id', id);
       if (error) {
-        console.error("Supabase Update Error:", error);
-        alert(`Błąd zapisu w chmurze: ${error.message}`);
+        toast.error(`Błąd zapisu: ${error.message}`);
       } else {
-        // Record payment in history
-        await supabase.from('payments').insert({
-          debt_id: id,
-          amount: amount
-        });
-
-        // Refresh payments list
-        const { data: pData } = await supabase
-          .from('payments')
-          .select('*, debts(name)')
-          .order('created_at', { descending: true })
-          .limit(10);
+        await supabase.from('payments').insert({ debt_id: id, amount: amount });
+        // Refresh payments
+        const { data: pData } = await supabase.from('payments').select('*, debts(name)').order('created_at', { descending: true }).limit(10);
         if (pData) setPayments(pData);
       }
-    } else {
-      console.log("Supabase not active, saved only locally.");
     }
 
     const updatedDebts = debts.map(d => d.id === id ? { ...d, current_amount: newAmount } : d);
@@ -227,25 +312,35 @@ export default function App() {
 
     if (supabase) {
       const { error } = await supabase.from('debts').delete().eq('id', id);
-      if (error) console.error("Delete error:", error);
+      if (error) {
+        toast.error(`Błąd usuwania: ${error.message}`);
+        return;
+      }
     }
 
     const updatedDebts = debts.filter(d => d.id !== id);
     persistDebts(updatedDebts);
+    toast.success("Dług został usunięty.");
   };
 
   const handleUndo = async (id) => {
     const debt = debts.find(d => d.id === id);
     if (!debt) return;
 
-    const newAmount = 100; // Restore small amount as per original logic
+    // Restore to 10% or something sensible if paid, or just add back if it was a mistake
+    const newAmount = 100;
 
     if (supabase) {
-      await supabase.from('debts').update({ current_amount: newAmount }).eq('id', id);
+      const { error } = await supabase.from('debts').update({ current_amount: newAmount }).eq('id', id);
+      if (error) {
+        toast.error(`Błąd: ${error.message}`);
+        return;
+      }
     }
 
     const updatedDebts = debts.map(d => d.id === id ? { ...d, current_amount: newAmount } : d);
     persistDebts(updatedDebts);
+    toast.info("Przywrócono dług do aktywnych.");
   };
 
   const triggerSuccess = () => {
@@ -463,30 +558,39 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75 hover:opacity-100 transition-opacity">
-              {paidDebts.map((debt) => (
-                <div key={debt.id} className="group bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex items-center justify-between hover:border-emerald-900/50 hover:bg-gray-900/60 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-emerald-900/30 p-2 rounded-full text-emerald-500">
-                      <Lock size={16} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-400 line-through decoration-emerald-500/50 decoration-2 group-hover:text-gray-300">{debt.name}</h3>
-                      <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                        <CheckCircle size={10} /> Spłacono {formatPLN(debt.initial_amount)}
+              <AnimatePresence mode="popLayout">
+                {paidDebts.map((debt) => (
+                  <motion.div
+                    key={debt.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    className="group bg-gray-900/40 border border-gray-800 rounded-lg p-4 flex items-center justify-between hover:border-emerald-900/50 hover:bg-gray-900/60 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-900/30 p-2 rounded-full text-emerald-500">
+                        <Lock size={16} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-400 line-through decoration-emerald-500/50 decoration-2 group-hover:text-gray-300">{debt.name}</h3>
+                        <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                          <CheckCircle size={10} /> Spłacono {formatPLN(debt.initial_amount)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleUndo(debt.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Przywróć do aktywnych (jeśli pomyłka)"
-                  >
-                    <RotateCcw size={14} />
-                  </Button>
-                </div>
-              ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUndo(debt.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Przywróć do aktywnych (jeśli pomyłka)"
+                    >
+                      <RotateCcw size={14} />
+                    </Button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         )}
@@ -494,142 +598,308 @@ export default function App() {
         {/* ACTIVE DEBTS SECTION */}
         <div className="space-y-4">
           <div className="flex justify-between items-end border-b border-gray-800 pb-2 mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-              <Zap size={20} className="text-yellow-400 fill-yellow-400" />
-              Do spłacenia
-            </h2>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
-                Metoda Kuli Śnieżnej
-              </span>
-              <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                  'bg-gray-500/10 text-gray-500 border-gray-500/20'
-                }`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                  syncStatus === 'offline' ? 'bg-orange-500' :
-                    'bg-gray-500'
-                  }`} />
-                {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
+            <div className="space-y-4 w-full">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                  <Zap size={20} className="text-yellow-400 fill-yellow-400" />
+                  Do spłacenia
+                </h2>
+                <Button variant="primary" size="sm" onClick={() => setIsAddModalOpen(true)}>
+                  <Plus size={16} />
+                  Dodaj Dług
+                </Button>
               </div>
 
-              {syncStatus === 'offline' && syncError && (
-                <div className="text-[10px] text-red-500 font-medium ml-2 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 max-w-[200px] truncate">
-                  ERROR: {syncError}
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
+                    Metoda Kuli Śnieżnej
+                  </span>
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                    syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                      'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                    }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                      syncStatus === 'offline' ? 'bg-orange-500' :
+                        'bg-gray-500'
+                      }`} />
+                    {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
+                  </div>
+
+                  {syncStatus === 'offline' && syncError && (
+                    <div className="text-[10px] text-red-500 font-medium ml-2 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 max-w-[200px] truncate">
+                      ERROR: {syncError}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
 
+          <AnimatePresence mode="popLayout">
+            {activeDebts.map((debt, index) => {
+              const isTopPriority = index === 0;
+
+              return (
+                <motion.div
+                  key={debt.id}
+                  layout
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
+                  <Card
+                    className={`transition-all duration-300 hover:shadow-xl hover:shadow-black/50 ${isTopPriority ? 'ring-1 ring-emerald-500/50 bg-gray-800' : 'bg-gray-800/80 hover:bg-gray-800'}`}
+                  >
+                    <div className="p-5">
+                      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+                        <div className="flex-1 relative">
+                          <button
+                            onClick={() => {
+                              setEditingDebt(debt);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="absolute -top-1 -right-1 text-gray-600 hover:text-emerald-500 p-1"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-bold text-white tracking-tight">
+                              {debt.name}
+                            </h3>
+                            {isTopPriority && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wide animate-pulse">
+                                Priorytet
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600">
+                              {getCategoryIcon(debt.category)} {debt.category}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400">
+                            {debt.installment && <span className="flex items-center gap-1"><span className="w-1 h-1 bg-gray-600 rounded-full"></span> Rata: <span className="text-gray-200 font-medium">{formatPLN(debt.installment)}</span></span>}
+                            {debt.rate !== '?' && <span className="flex items-center gap-1"><span className="w-1 h-1 bg-gray-600 rounded-full"></span> RRSO: <span className="text-gray-200">{debt.rate}</span></span>}
+                          </div>
+
+                          {debt.note && (
+                            <p className="text-xs text-yellow-500/90 mt-2 flex items-center gap-1.5 font-medium bg-yellow-500/10 px-2 py-1 rounded w-fit">
+                              <AlertCircle size={12} /> {debt.note}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right pl-4 border-l border-gray-700/50">
+                          <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pozostało</div>
+                          <div className="text-2xl font-mono font-bold text-white">
+                            {formatPLN(debt.current_amount)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <ProgressBar current={debt.current_amount} total={debt.initial_amount} colorClass={isTopPriority ? "bg-gradient-to-r from-red-500 to-orange-500" : "bg-emerald-600"} />
+
+                        <div className="flex justify-between items-center pt-2">
+                          <button
+                            onClick={() => handleDeleteDebt(debt.id)}
+                            className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                            title="Usuń dług"
+                          >
+                            <RotateCcw size={14} className="rotate-45" />
+                          </button>
+
+                          {editingId && editingId === debt.id ? (
+                            <div className="flex gap-2 items-center w-full md:w-auto bg-gray-900/90 p-1.5 rounded-lg border border-gray-600 animate-in fade-in slide-in-from-right-4 shadow-xl">
+                              <input
+                                type="number"
+                                placeholder="Kwota..."
+                                value={payAmount}
+                                onChange={(e) => setPayAmount(e.target.value)}
+                                className="bg-gray-800 border border-gray-600 text-white px-3 py-1.5 rounded focus:outline-none focus:border-emerald-500 w-full md:w-32 text-right"
+                                autoFocus
+                              />
+                              <Button onClick={() => handlePayment(debt.id)} variant="primary" size="sm">
+                                Zatwierdź
+                              </Button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="px-3 py-1 text-sm text-gray-400 hover:text-white"
+                              >
+                                Anuluj
+                              </button>
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => {
+                                setEditingId(debt.id);
+                                setPayAmount('');
+                              }}
+                              variant={isTopPriority ? "primary" : "secondary"}
+                              size="sm"
+                              className="w-full md:w-auto"
+                            >
+                              <ArrowUpRight size={16} />
+                              {isTopPriority ? "Atakuj ten dług!" : "Dodaj wpłatę"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
           {activeDebts.length === 0 && (
-            <div className="p-8 text-center border border-dashed border-gray-700 rounded-xl bg-gray-900/50">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-8 text-center border border-dashed border-gray-700 rounded-xl bg-gray-900/50"
+            >
               <Trophy size={48} className="mx-auto text-yellow-500 mb-4" />
               <h3 className="text-2xl font-bold text-white mb-2">JESTEŚ WOLNY!</h3>
               <p className="text-gray-400">Wszystkie zobowiązania zostały spłacone. Czas na nowe cele!</p>
-            </div>
+            </motion.div>
           )}
-
-          {activeDebts.map((debt, index) => {
-            const isTopPriority = index === 0;
-
-            return (
-              <Card
-                key={debt.id}
-                className={`transition-all duration-300 hover:shadow-xl hover:shadow-black/50 ${isTopPriority ? 'ring-1 ring-emerald-500/50 bg-gray-800' : 'bg-gray-800/80 hover:bg-gray-800'}`}
-              >
-                <div className="p-5">
-                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-bold text-white tracking-tight">
-                          {debt.name}
-                        </h3>
-                        {isTopPriority && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wide animate-pulse">
-                            Priorytet
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600">
-                          {getCategoryIcon(debt.category)} {debt.category}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400">
-                        {debt.installment && <span className="flex items-center gap-1"><span className="w-1 h-1 bg-gray-600 rounded-full"></span> Rata: <span className="text-gray-200 font-medium">{formatPLN(debt.installment)}</span></span>}
-                        {debt.rate !== '?' && <span className="flex items-center gap-1"><span className="w-1 h-1 bg-gray-600 rounded-full"></span> RRSO: <span className="text-gray-200">{debt.rate}</span></span>}
-                      </div>
-
-                      {debt.note && (
-                        <p className="text-xs text-yellow-500/90 mt-2 flex items-center gap-1.5 font-medium bg-yellow-500/10 px-2 py-1 rounded w-fit">
-                          <AlertCircle size={12} /> {debt.note}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right pl-4 border-l border-gray-700/50">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pozostało</div>
-                      <div className="text-2xl font-mono font-bold text-white">
-                        {formatPLN(debt.current_amount)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <ProgressBar current={debt.current_amount} total={debt.initial_amount} colorClass={isTopPriority ? "bg-gradient-to-r from-red-500 to-orange-500" : "bg-emerald-600"} />
-
-                    <div className="flex justify-between items-center pt-2">
-                      <button
-                        onClick={() => handleDeleteDebt(debt.id)}
-                        className="text-gray-500 hover:text-red-400 transition-colors p-1"
-                        title="Usuń dług"
-                      >
-                        <RotateCcw size={14} className="rotate-45" />
-                      </button>
-
-                      {editingId && editingId === debt.id ? (
-                        <div className="flex gap-2 items-center w-full md:w-auto bg-gray-900/90 p-1.5 rounded-lg border border-gray-600 animate-in fade-in slide-in-from-right-4 shadow-xl">
-                          <input
-                            type="number"
-                            placeholder="Kwota..."
-                            value={payAmount}
-                            onChange={(e) => setPayAmount(e.target.value)}
-                            className="bg-gray-800 border border-gray-600 text-white px-3 py-1.5 rounded focus:outline-none focus:border-emerald-500 w-full md:w-32 text-right"
-                            autoFocus
-                          />
-                          <Button onClick={() => handlePayment(debt.id)} variant="primary" size="sm">
-                            Zatwierdź
-                          </Button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="px-3 py-1 text-sm text-gray-400 hover:text-white"
-                          >
-                            Anuluj
-                          </button>
-                        </div>
-                      ) : (
-                        <Button
-                          onClick={() => {
-                            setEditingId(debt.id);
-                            setPayAmount('');
-                          }}
-                          variant={isTopPriority ? "primary" : "secondary"}
-                          size="sm"
-                          className="w-full md:w-auto"
-                        >
-                          <ArrowUpRight size={16} />
-                          {isTopPriority ? "Atakuj ten dług!" : "Dodaj wpłatę"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
         </div>
-
       </div>
+
+      {/* --- MODALS --- */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Dodaj Nowe Zobowiązanie"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nazwa</label>
+            <input
+              type="text"
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+              placeholder="np. Santander Karta"
+              value={newDebt.name}
+              onChange={(e) => setNewDebt({ ...newDebt, name: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kwota Początkowa</label>
+              <input
+                type="number"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                value={newDebt.initial_amount}
+                onChange={(e) => setNewDebt({ ...newDebt, initial_amount: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Do Spłaty (Dziś)</label>
+              <input
+                type="number"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                value={newDebt.current_amount}
+                onChange={(e) => setNewDebt({ ...newDebt, current_amount: e.target.value })}
+                placeholder="Opcjonalnie"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Rata Miesięczna</label>
+              <input
+                type="number"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                value={newDebt.installment}
+                onChange={(e) => setNewDebt({ ...newDebt, installment: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Priorytet (1-10)</label>
+              <input
+                type="number"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                value={newDebt.priority}
+                onChange={(e) => setNewDebt({ ...newDebt, priority: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button className="flex-1" onClick={handleSaveNewDebt}>Dodaj Dług</Button>
+            <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>Anuluj</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edytuj Dług"
+      >
+        {editingDebt && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nazwa</label>
+              <input
+                type="text"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                value={editingDebt.name}
+                onChange={(e) => setEditingDebt({ ...editingDebt, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kwota Początkowa</label>
+                <input
+                  type="number"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  value={editingDebt.initial_amount}
+                  onChange={(e) => setEditingDebt({ ...editingDebt, initial_amount: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Do Spłaty</label>
+                <input
+                  type="number"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  value={editingDebt.current_amount}
+                  onChange={(e) => setEditingDebt({ ...editingDebt, current_amount: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Rata Miesięczna</label>
+                <input
+                  type="number"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  value={editingDebt.installment || ''}
+                  onChange={(e) => setEditingDebt({ ...editingDebt, installment: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oprocentowanie (%)</label>
+                <input
+                  type="text"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  value={editingDebt.rate}
+                  onChange={(e) => setEditingDebt({ ...editingDebt, rate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button className="flex-1" onClick={handleUpdateDebtDetails}>Zapisz Zmiany</Button>
+              <Button variant="danger" onClick={() => {
+                handleDeleteDebt(editingDebt.id);
+                setIsEditModalOpen(false);
+              }}>Usuń Dług</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Toaster position="bottom-right" theme="dark" richColors />
     </div>
   );
 }
