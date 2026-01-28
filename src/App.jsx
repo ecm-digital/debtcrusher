@@ -78,20 +78,8 @@ const ProgressBar = ({ current, total, colorClass = "bg-emerald-500" }) => {
   );
 };
 
-// Initial data backup
-const INITIAL_DEBTS = [
-  { id: 1, name: 'Vivigo', category: 'Chwilówka', initial_amount: 1458.60, current_amount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI - Spłać to natychmiast!' },
-  { id: 2, name: 'Santander Karta', category: 'Prywatne', initial_amount: 2092.01, current_amount: 2092.01, rate: '?', priority: 2, note: 'Wysoki - Szybkie zwycięstwo' },
-  { id: 3, name: 'Net Credit', category: 'Chwilówka', initial_amount: 4704.50, current_amount: 4704.50, rate: '?', priority: 3, note: 'Wysoki - Uważaj na ukryte koszty' },
-  { id: 4, name: 'Wonga', category: 'Pożyczka', initial_amount: 8153.46, current_amount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'Zabójca Cashflow - Rata 1000zł!' },
-  { id: 5, name: 'mBank Karta Kredytowa', category: 'Firmowe', initial_amount: 9245.08, current_amount: 9245.08, rate: '15%', priority: 5, note: 'Wysokie oprocentowanie' },
-  { id: 6, name: 'Smartkey', category: 'Pożyczka', initial_amount: 12070.71, current_amount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: '' },
-  { id: 7, name: 'mBank Odnawialny (Pryw)', category: 'Prywatne', initial_amount: 15200.00, current_amount: 15200.00, rate: '12.10%', priority: 7, note: 'Spłacaj nadwyżkami' },
-  { id: 8, name: 'mBank Pożyczka', category: 'Firmowe', initial_amount: 18191.51, current_amount: 18191.51, rate: '12.7%', priority: 8, note: '' },
-  { id: 9, name: 'mBank Odnawialny (Firma)', category: 'Firmowe', initial_amount: 18400.00, current_amount: 18400.00, rate: '10.7%', priority: 9, note: 'Najniższy procent' },
-  { id: 10, name: 'mBank Raty', category: 'Firmowe', initial_amount: 23072.72, current_amount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'Stabilna rata' },
-  { id: 11, name: 'mBank Gotówkowy', category: 'Prywatne', initial_amount: 50119.53, current_amount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'Długi termin' },
-];
+// Initial data - empty on start
+const INITIAL_DEBTS = [];
 
 export default function App() {
   const [debts, setDebts] = useState([]);
@@ -124,51 +112,42 @@ export default function App() {
             console.log('Data loaded from Supabase:', data.length, 'records');
             setDebts(data);
             localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
-            setLoading(false);
-            return;
           } else {
-            // Database is empty - let's seed it with initial data
-            console.log('Supabase is empty, seeding initial data...');
+            // If Supabase is empty, check localStorage
             const localData = localStorage.getItem('tomek_debts_v1');
-            const initialToSeed = localData ? JSON.parse(localData) : INITIAL_DEBTS;
-
-            // Remove local IDs to let Supabase generate its own bigint IDs
-            const dataToInsert = initialToSeed.map(({ id, ...rest }) => rest);
-
-            const { data: inserted, error: insertError } = await supabase
-              .from('debts')
-              .insert(dataToInsert)
-              .select();
-
-            if (insertError) {
-              console.error("Seeding error:", insertError);
-            } else if (inserted) {
-              console.log('Seeded successfully:', inserted.length, 'records');
-              setDebts(inserted);
-              localStorage.setItem('tomek_debts_v1', JSON.stringify(inserted));
-              setLoading(false);
-              return;
+            if (localData) {
+              setDebts(JSON.parse(localData));
+            } else {
+              setDebts([]);
             }
           }
         } catch (e) {
           console.error("Supabase operation failed:", e);
         }
-      }
-
-      // Fallback to localStorage if Supabase failed or isn't configured
-      const localData = localStorage.getItem('tomek_debts_v1');
-      if (localData) {
-        console.log('Loading from localStorage');
-        setDebts(JSON.parse(localData));
       } else {
-        console.log('Loading initial defaults');
-        setDebts(INITIAL_DEBTS);
+        // Fallback to localStorage if Supabase failed or isn't configured
+        const localData = localStorage.getItem('tomek_debts_v1');
+        setDebts(localData ? JSON.parse(localData) : []);
       }
       setLoading(false);
     };
 
     fetchData();
   }, []);
+
+  const clearAllDebts = async () => {
+    if (!confirm('Czy na pewno chcesz usunąć WSZYSTKIE długi? Tego nie da się cofnąć.')) return;
+
+    setLoading(true);
+    if (supabase) {
+      const { error } = await supabase.from('debts').delete().neq('id', 0); // Delete all
+      if (error) console.error("Error clearing database:", error);
+    }
+
+    setDebts([]);
+    localStorage.removeItem('tomek_debts_v1');
+    setLoading(false);
+  };
 
   // Helper to save data
   const persistDebts = async (updatedDebts) => {
@@ -360,6 +339,9 @@ export default function App() {
               <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
                 Metoda Kuli Śnieżnej
               </span>
+              <Button onClick={clearAllDebts} variant="danger" size="sm">
+                Wyczyść wszystko
+              </Button>
               <Button onClick={() => setIsAdding(!isAdding)} variant="outline" size="sm">
                 {isAdding ? 'Anuluj' : '+ Dodaj dług'}
               </Button>
