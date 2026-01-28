@@ -17,8 +17,8 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // --- Supabase Configuration & Initialization ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL);
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY);
+const supabaseUrl = typeof __SUPABASE_URL__ !== 'undefined' ? __SUPABASE_URL__ : import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = typeof __SUPABASE_KEY__ !== 'undefined' ? __SUPABASE_KEY__ : import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabase = null;
 try {
