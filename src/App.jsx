@@ -88,6 +88,7 @@ export default function App() {
   const [payAmount, setPayAmount] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
   const [syncStatus, setSyncStatus] = useState('checking'); // 'checking', 'connected', 'offline'
+  const [syncError, setSyncError] = useState(null);
 
   // 1. Data Loading
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function App() {
         } catch (e) {
           console.error("Supabase operation failed:", e);
           setSyncStatus('offline');
+          setSyncError(e.message || "Błąd połączenia z Supabase");
           const localData = localStorage.getItem('tomek_debts_v1');
           setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
         }
@@ -320,15 +322,21 @@ export default function App() {
                 Metoda Kuli Śnieżnej
               </span>
               <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                  syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                  'bg-gray-500/10 text-gray-500 border-gray-500/20'
                 }`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                    syncStatus === 'offline' ? 'bg-orange-500' :
-                      'bg-gray-500'
+                  syncStatus === 'offline' ? 'bg-orange-500' :
+                    'bg-gray-500'
                   }`} />
                 {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
               </div>
+
+              {syncStatus === 'offline' && syncError && (
+                <div className="text-[10px] text-red-500 font-medium ml-2 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 max-w-[200px] truncate">
+                  ERROR: {syncError}
+                </div>
+              )}
             </div>
           </div>
 
