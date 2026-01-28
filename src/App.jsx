@@ -14,45 +14,15 @@ import {
   Loader2,
   Users
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-// Firebase imports
-import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInAnonymously,
-  signInWithCustomToken
-} from 'firebase/auth';
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  onSnapshot,
-  collection
-} from 'firebase/firestore';
+// --- Supabase Configuration & Initialization ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// --- Firebase Configuration & Initialization ---
-// For local development, we check if these variables exist, otherwise we use placeholders
-const firebaseConfig = typeof __firebase_config !== 'undefined'
-  ? JSON.parse(__firebase_config)
-  : {
-    apiKey: "PLACEHOLDER",
-    authDomain: "PLACEHOLDER",
-    projectId: "PLACEHOLDER",
-    storageBucket: "PLACEHOLDER",
-    messagingSenderId: "PLACEHOLDER",
-    appId: "PLACEHOLDER"
-  };
-
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-debt-crusher';
-
-let app, auth, db;
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) {
-  console.error("Firebase initialization failed:", error);
+let supabase = null;
+if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'YOUR_SUPABASE_URL') {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
 }
 
 // --- Components ---
@@ -62,7 +32,7 @@ const Card = ({ children, className = '' }) => (
   </div>
 );
 
-const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, size = 'normal' }) => {
+const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, size = 'normal', type = 'button' }) => {
   const baseStyle = "rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2";
   const sizes = {
     normal: "px-4 py-2",
@@ -79,6 +49,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
 
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`${baseStyle} ${sizes[size]} ${variants[variant]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -105,194 +76,156 @@ const ProgressBar = ({ current, total, colorClass = "bg-emerald-500" }) => {
 
 // Initial data backup
 const INITIAL_DEBTS = [
-  { id: 1, name: 'Vivigo', category: 'Chwilówka', initialAmount: 1458.60, currentAmount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI - Spłać to natychmiast!' },
-  { id: 2, name: 'Santander Karta', category: 'Prywatne', initialAmount: 2092.01, currentAmount: 2092.01, rate: '?', priority: 2, note: 'Wysoki - Szybkie zwycięstwo' },
-  { id: 3, name: 'Net Credit', category: 'Chwilówka', initialAmount: 4704.50, currentAmount: 4704.50, rate: '?', priority: 3, note: 'Wysoki - Uważaj na ukryte koszty' },
-  { id: 4, name: 'Wonga', category: 'Pożyczka', initialAmount: 8153.46, currentAmount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'Zabójca Cashflow - Rata 1000zł!' },
-  { id: 5, name: 'mBank Karta Kredytowa', category: 'Firmowe', initialAmount: 9245.08, currentAmount: 9245.08, rate: '15%', priority: 5, note: 'Wysokie oprocentowanie' },
-  { id: 6, name: 'Smartkey', category: 'Pożyczka', initialAmount: 12070.71, currentAmount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: '' },
-  { id: 7, name: 'mBank Odnawialny (Pryw)', category: 'Prywatne', initialAmount: 15200.00, currentAmount: 15200.00, rate: '12.10%', priority: 7, note: 'Spłacaj nadwyżkami' },
-  { id: 8, name: 'mBank Pożyczka', category: 'Firmowe', initialAmount: 18191.51, currentAmount: 18191.51, rate: '12.7%', priority: 8, note: '' },
-  { id: 9, name: 'mBank Odnawialny (Firma)', category: 'Firmowe', initialAmount: 18400.00, currentAmount: 18400.00, rate: '10.7%', priority: 9, note: 'Najniższy procent' },
-  { id: 10, name: 'mBank Raty', category: 'Firmowe', initialAmount: 23072.72, currentAmount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'Stabilna rata' },
-  { id: 11, name: 'mBank Gotówkowy', category: 'Prywatne', initialAmount: 50119.53, currentAmount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'Długi termin' },
+  { id: 1, name: 'Vivigo', category: 'Chwilówka', initial_amount: 1458.60, current_amount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI - Spłać to natychmiast!' },
+  { id: 2, name: 'Santander Karta', category: 'Prywatne', initial_amount: 2092.01, current_amount: 2092.01, rate: '?', priority: 2, note: 'Wysoki - Szybkie zwycięstwo' },
+  { id: 3, name: 'Net Credit', category: 'Chwilówka', initial_amount: 4704.50, current_amount: 4704.50, rate: '?', priority: 3, note: 'Wysoki - Uważaj na ukryte koszty' },
+  { id: 4, name: 'Wonga', category: 'Pożyczka', initial_amount: 8153.46, current_amount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'Zabójca Cashflow - Rata 1000zł!' },
+  { id: 5, name: 'mBank Karta Kredytowa', category: 'Firmowe', initial_amount: 9245.08, current_amount: 9245.08, rate: '15%', priority: 5, note: 'Wysokie oprocentowanie' },
+  { id: 6, name: 'Smartkey', category: 'Pożyczka', initial_amount: 12070.71, current_amount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: '' },
+  { id: 7, name: 'mBank Odnawialny (Pryw)', category: 'Prywatne', initial_amount: 15200.00, current_amount: 15200.00, rate: '12.10%', priority: 7, note: 'Spłacaj nadwyżkami' },
+  { id: 8, name: 'mBank Pożyczka', category: 'Firmowe', initial_amount: 18191.51, current_amount: 18191.51, rate: '12.7%', priority: 8, note: '' },
+  { id: 9, name: 'mBank Odnawialny (Firma)', category: 'Firmowe', initial_amount: 18400.00, current_amount: 18400.00, rate: '10.7%', priority: 9, note: 'Najniższy procent' },
+  { id: 10, name: 'mBank Raty', category: 'Firmowe', initial_amount: 23072.72, current_amount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'Stabilna rata' },
+  { id: 11, name: 'mBank Gotówkowy', category: 'Prywatne', initial_amount: 50119.53, current_amount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'Długi termin' },
 ];
 
 export default function App() {
-  const [user, setUser] = useState(null);
   const [debts, setDebts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newDebt, setNewDebt] = useState({ name: '', initial_amount: '', category: 'Prywatne', note: '' });
 
-  // 1. Auth Setup
+  // 1. Data Loading
   useEffect(() => {
-    const loadLocalData = () => {
-      const localData = localStorage.getItem('tomek_debts_v1');
-      setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
-    };
+    const fetchData = async () => {
+      setLoading(true);
 
-    if (!auth) {
-      // If Firebase failed to init, we just use local data
-      setLoading(false);
-      loadLocalData();
-      return;
-    }
+      // Try Supabase first
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('debts')
+            .select('*')
+            .order('priority', { ascending: true });
 
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            setDebts(data);
+            localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.error("Supabase error:", e);
         }
-      } catch (error) {
-        console.error("Auth error:", error);
-        // Fallback to local data if auth fails
-        setLoading(false);
-        loadLocalData();
       }
+
+      // Fallback to localStorage
+      const localData = localStorage.getItem('tomek_debts_v1');
+      if (localData) {
+        setDebts(JSON.parse(localData));
+      } else {
+        setDebts(INITIAL_DEBTS);
+      }
+      setLoading(false);
     };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+
+    fetchData();
   }, []);
 
-  // 2. Data Sync with Firestore
-  useEffect(() => {
-    if (!user || !db) return;
-
-    // Use a specific document for this app instance to share data
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'financials', 'debts');
-
-    const unsubscribe = onSnapshot(docRef, async (snapshot) => {
-      setLoading(false);
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        if (data && data.items) {
-          setDebts(data.items);
-          // Sync back to local storage
-          localStorage.setItem('tomek_debts_v1', JSON.stringify(data.items));
-        }
-      } else {
-        // First time load: Check if we have local data to migrate
-        const localData = localStorage.getItem('tomek_debts_v1');
-        const initialData = localData ? JSON.parse(localData) : INITIAL_DEBTS;
-
-        // Save initial data to Firestore
-        try {
-          await setDoc(docRef, { items: initialData });
-        } catch (e) {
-          console.error("Error saving initial data to Firestore:", e);
-        }
-        setDebts(initialData);
-      }
-    }, (error) => {
-      console.error("Firestore error:", error);
-      setLoading(false);
-      // Fallback to local
-      const localData = localStorage.getItem('tomek_debts_v1');
-      if (localData) setDebts(JSON.parse(localData));
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // Helper to save to Firestore
-  const updateDebtsInCloud = async (newDebts) => {
-    // Also save to local storage as backup
-    localStorage.setItem('tomek_debts_v1', JSON.stringify(newDebts));
-
-    if (!user || !db) return;
-    try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'financials', 'debts');
-      await setDoc(docRef, { items: newDebts });
-    } catch (error) {
-      console.error("Error updating debts:", error);
-    }
+  // Helper to save data
+  const persistDebts = async (updatedDebts) => {
+    setDebts(updatedDebts);
+    localStorage.setItem('tomek_debts_v1', JSON.stringify(updatedDebts));
   };
-
-  // Calculations
-  const totalDebt = debts.reduce((acc, curr) => acc + (curr.currentAmount || 0), 0);
-  const initialTotal = debts.reduce((acc, curr) => acc + (curr.initialAmount || 0), 0);
-  const totalPaid = initialTotal - totalDebt;
-  const percentPaid = initialTotal > 0 ? ((totalPaid / initialTotal) * 100).toFixed(1) : "0.0";
-
-  // Sorting
-  const activeDebts = Array.isArray(debts) ? debts
-    .filter(d => d.currentAmount > 0)
-    .sort((a, b) => a.currentAmount - b.currentAmount) : [];
-
-  const paidDebts = Array.isArray(debts) ? debts
-    .filter(d => d.currentAmount === 0)
-    .sort((a, b) => a.initialAmount - b.initialAmount) : [];
 
   const handlePayment = async (id) => {
     if (!payAmount) return;
     const amount = parseFloat(payAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) return;
 
-    const newDebts = debts.map(debt => {
-      if (debt.id === id) {
-        const newAmount = Math.max(0, debt.currentAmount - amount);
-        if (newAmount === 0) triggerSuccess();
-        return { ...debt, currentAmount: newAmount };
-      }
-      return debt;
-    });
+    const debt = debts.find(d => d.id === id);
+    if (!debt) return;
 
-    // Optimistic update
-    setDebts(newDebts);
+    const newAmount = Math.max(0, debt.current_amount - amount);
+    if (newAmount === 0) triggerSuccess();
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('debts')
+        .update({ current_amount: newAmount })
+        .eq('id', id);
+      if (error) console.error("Update error:", error);
+    }
+
+    const updatedDebts = debts.map(d => d.id === id ? { ...d, current_amount: newAmount } : d);
+    persistDebts(updatedDebts);
     setPayAmount('');
     setEditingId(null);
-
-    // Cloud update
-    await updateDebtsInCloud(newDebts);
   };
-
-  const handleUndo = async (id) => {
-    const newDebts = debts.map(debt => {
-      if (debt.id === id) {
-        return { ...debt, currentAmount: 100 }; // Restore small amount
-      }
-      return debt;
-    });
-
-    setDebts(newDebts);
-    await updateDebtsInCloud(newDebts);
-  };
-
-  const [isAdding, setIsAdding] = useState(false);
-  const [newDebt, setNewDebt] = useState({ name: '', initialAmount: '', category: 'Prywatne', note: '' });
 
   const handleAddDebt = async (e) => {
     e.preventDefault();
-    if (!newDebt.name || !newDebt.initialAmount) return;
+    if (!newDebt.name || !newDebt.initial_amount) return;
 
-    const debt = {
-      id: Date.now(),
+    const debtData = {
       name: newDebt.name,
       category: newDebt.category,
-      initialAmount: parseFloat(newDebt.initialAmount),
-      currentAmount: parseFloat(newDebt.initialAmount),
-      rate: '?',
+      initial_amount: parseFloat(newDebt.initial_amount),
+      current_amount: parseFloat(newDebt.initial_amount),
       priority: debts.length + 1,
       note: newDebt.note
     };
 
-    const newDebts = [...debts, debt];
-    setDebts(newDebts);
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('debts')
+        .insert([debtData])
+        .select();
+
+      if (!error && data) {
+        persistDebts([...debts, data[0]]);
+      } else {
+        console.error("Insert error:", error);
+        // Local only fallback
+        persistDebts([...debts, { ...debtData, id: Date.now() }]);
+      }
+    } else {
+      persistDebts([...debts, { ...debtData, id: Date.now() }]);
+    }
+
     setIsAdding(false);
-    setNewDebt({ name: '', initialAmount: '', category: 'Prywatne', note: '' });
-    await updateDebtsInCloud(newDebts);
+    setNewDebt({ name: '', initial_amount: '', category: 'Prywatne', note: '' });
   };
 
   const handleDeleteDebt = async (id) => {
     if (!confirm('Czy na pewno chcesz usunąć ten dług?')) return;
-    const newDebts = debts.filter(d => d.id !== id);
-    setDebts(newDebts);
-    await updateDebtsInCloud(newDebts);
+
+    if (supabase) {
+      const { error } = await supabase.from('debts').delete().eq('id', id);
+      if (error) console.error("Delete error:", error);
+    }
+
+    const updatedDebts = debts.filter(d => d.id !== id);
+    persistDebts(updatedDebts);
+  };
+
+  const handleUndo = async (id) => {
+    const debt = debts.find(d => d.id === id);
+    if (!debt) return;
+
+    const newAmount = 100; // Restore small amount as per original logic
+
+    if (supabase) {
+      await supabase.from('debts').update({ current_amount: newAmount }).eq('id', id);
+    }
+
+    const updatedDebts = debts.map(d => d.id === id ? { ...d, current_amount: newAmount } : d);
+    persistDebts(updatedDebts);
   };
 
   const triggerSuccess = () => {
@@ -313,11 +246,25 @@ export default function App() {
     }
   };
 
+  // Calculations
+  const totalDebt = debts.reduce((acc, curr) => acc + (parseFloat(curr.current_amount) || 0), 0);
+  const initialTotal = debts.reduce((acc, curr) => acc + (parseFloat(curr.initial_amount) || 0), 0);
+  const totalPaid = initialTotal - totalDebt;
+  const percentPaid = initialTotal > 0 ? ((totalPaid / initialTotal) * 100).toFixed(1) : "0.0";
+
+  const activeDebts = debts
+    .filter(d => parseFloat(d.current_amount) > 0)
+    .sort((a, b) => parseFloat(a.current_amount) - parseFloat(b.current_amount));
+
+  const paidDebts = debts
+    .filter(d => parseFloat(d.current_amount) === 0)
+    .sort((a, b) => parseFloat(a.initial_amount) - parseFloat(b.initial_amount));
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-emerald-500 gap-4">
         <Loader2 className="animate-spin" size={48} />
-        <p className="text-gray-400 animate-pulse">Synchronizacja danych...</p>
+        <p className="text-gray-400 animate-pulse">Ładowanie danych...</p>
       </div>
     );
   }
@@ -335,7 +282,7 @@ export default function App() {
               </h1>
               <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
                 <Users size={14} className="text-emerald-500" />
-                <span>{db ? 'Tryb online: Dane są synchronizowane' : 'Tryb offline: Dane lokalne'}</span>
+                <span>{supabase ? 'Tryb online: Supabase' : 'Tryb offline: Dane lokalne'}</span>
               </div>
             </div>
             {showConfetti && (
@@ -386,9 +333,9 @@ export default function App() {
             </div>
           </div>
 
-          {!db && (
+          {!supabase && (
             <div className="text-xs text-yellow-500 bg-yellow-950/20 p-2 rounded border border-yellow-900/30 mb-4">
-              Uwaga: Brak konfiguracji Firebase. Aplikacja działa w trybie demo z danymi lokalnymi.
+              Uwaga: Brak konfiguracji Supabase. Ustaw VITE_SUPABASE_URL i VITE_SUPABASE_ANON_KEY w .env.
             </div>
           )}
 
@@ -412,8 +359,8 @@ export default function App() {
                       required
                       type="number"
                       step="0.01"
-                      value={newDebt.initialAmount}
-                      onChange={e => setNewDebt({ ...newDebt, initialAmount: e.target.value })}
+                      value={newDebt.initial_amount}
+                      onChange={e => setNewDebt({ ...newDebt, initial_amount: e.target.value })}
                       className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none"
                       placeholder="np. 2500"
                     />
@@ -497,13 +444,13 @@ export default function App() {
                     <div className="text-right pl-4 border-l border-gray-700/50">
                       <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pozostało</div>
                       <div className="text-2xl font-mono font-bold text-white">
-                        {formatPLN(debt.currentAmount)}
+                        {formatPLN(debt.current_amount)}
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <ProgressBar current={debt.currentAmount} total={debt.initialAmount} colorClass={isTopPriority ? "bg-gradient-to-r from-red-500 to-orange-500" : "bg-emerald-600"} />
+                    <ProgressBar current={debt.current_amount} total={debt.initial_amount} colorClass={isTopPriority ? "bg-gradient-to-r from-red-500 to-orange-500" : "bg-emerald-600"} />
 
                     <div className="flex justify-between items-center pt-2">
                       <button
@@ -578,7 +525,7 @@ export default function App() {
                     <div>
                       <h3 className="font-bold text-gray-400 line-through decoration-emerald-500/50 decoration-2 group-hover:text-gray-300">{debt.name}</h3>
                       <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                        <CheckCircle size={10} /> Spłacono {formatPLN(debt.initialAmount)}
+                        <CheckCircle size={10} /> Spłacono {formatPLN(debt.initial_amount)}
                       </div>
                     </div>
                   </div>
