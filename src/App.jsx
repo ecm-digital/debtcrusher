@@ -338,8 +338,11 @@ export default function App() {
           </div>
 
           {!supabase && (
-            <div className="text-xs text-yellow-500 bg-yellow-950/20 p-2 rounded border border-yellow-900/30 mb-4">
-              Uwaga: Tryb offline. Skonfiguruj VITE_SUPABASE_URL w .env, aby włączyć synchronizację.
+            <div className="text-xs text-red-400 bg-red-950/20 p-3 rounded border border-red-900/30 mb-4 space-y-1">
+              <p><strong>Błąd konfiguracji Supabase (Tryb Offline):</strong></p>
+              <p>• URL: {supabaseUrl ? `Wykryto (${supabaseUrl.substring(0, 10)}...)` : 'BRAK'}</p>
+              <p>• KEY: {supabaseAnonKey ? `Wykryto (${supabaseAnonKey.substring(0, 5)}...)` : 'BRAK'}</p>
+              <p className="mt-2 italic opacity-70">Upewnij się, że plik .env znajduje się w: {`/Users/tomaszgt/Debt Crusher/.env`}</p>
             </div>
           )}
 
