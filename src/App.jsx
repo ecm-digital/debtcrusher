@@ -99,6 +99,7 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('checking'); // 'checking', 'connected', 'offline'
 
   // 1. Data Loading
   useEffect(() => {
@@ -122,6 +123,7 @@ export default function App() {
             console.log('Data loaded from Supabase:', data.length, 'records');
             setDebts(data);
             localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
+            setSyncStatus('connected');
           } else {
             // If Supabase is empty, check if we have something in INITIAL_DEBTS to seed
             console.log('Supabase is empty, seeding your real data...');
@@ -142,14 +144,17 @@ export default function App() {
               console.log('Seeded successfully with your real data');
               setDebts(inserted);
               localStorage.setItem('tomek_debts_v1', JSON.stringify(inserted));
+              setSyncStatus('connected');
             }
           }
         } catch (e) {
           console.error("Supabase operation failed:", e);
+          setSyncStatus('offline');
           const localData = localStorage.getItem('tomek_debts_v1');
           setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
         }
       } else {
+        setSyncStatus('offline');
         const localData = localStorage.getItem('tomek_debts_v1');
         setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
       }
@@ -178,11 +183,21 @@ export default function App() {
     if (newAmount === 0) triggerSuccess();
 
     if (supabase) {
-      const { error } = await supabase
+      console.log(`Sending update to Supabase for ID: ${id}, New Amount: ${newAmount}`);
+      const { error, data } = await supabase
         .from('debts')
         .update({ current_amount: newAmount })
-        .eq('id', id);
-      if (error) console.error("Update error:", error);
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error("Supabase Update Error:", error);
+        alert(`Błąd zapisu w chmurze: ${error.message}`);
+      } else {
+        console.log("Supabase update success:", data);
+      }
+    } else {
+      console.log("Supabase not active, saved only locally.");
     }
 
     const updatedDebts = debts.map(d => d.id === id ? { ...d, current_amount: newAmount } : d);
@@ -316,6 +331,16 @@ export default function App() {
               <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
                 Metoda Kuli Śnieżnej
               </span>
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${syncStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                  syncStatus === 'offline' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                }`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                    syncStatus === 'offline' ? 'bg-orange-500' :
+                      'bg-gray-500'
+                  }`} />
+                {syncStatus === 'connected' ? 'Cloud Sync' : syncStatus === 'offline' ? 'Offline Mode' : 'Connecting...'}
+              </div>
             </div>
           </div>
 
