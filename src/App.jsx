@@ -99,8 +99,6 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const [newDebt, setNewDebt] = useState({ name: '', initial_amount: '', category: 'Prywatne', note: '' });
 
   // 1. Data Loading
   useEffect(() => {
@@ -191,40 +189,6 @@ export default function App() {
     persistDebts(updatedDebts);
     setPayAmount('');
     setEditingId(null);
-  };
-
-  const handleAddDebt = async (e) => {
-    e.preventDefault();
-    if (!newDebt.name || !newDebt.initial_amount) return;
-
-    const debtData = {
-      name: newDebt.name,
-      category: newDebt.category,
-      initial_amount: parseFloat(newDebt.initial_amount),
-      current_amount: parseFloat(newDebt.initial_amount),
-      priority: debts.length + 1,
-      note: newDebt.note
-    };
-
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('debts')
-        .insert([debtData])
-        .select();
-
-      if (!error && data) {
-        persistDebts([...debts, data[0]]);
-      } else {
-        console.error("Insert error:", error);
-        // Local only fallback
-        persistDebts([...debts, { ...debtData, id: Date.now() }]);
-      }
-    } else {
-      persistDebts([...debts, { ...debtData, id: Date.now() }]);
-    }
-
-    setIsAdding(false);
-    setNewDebt({ name: '', initial_amount: '', category: 'Prywatne', note: '' });
   };
 
   const handleDeleteDebt = async (id) => {
@@ -352,9 +316,6 @@ export default function App() {
               <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
                 Metoda Kuli Śnieżnej
               </span>
-              <Button onClick={() => setIsAdding(!isAdding)} variant="outline" size="sm">
-                {isAdding ? 'Anuluj' : '+ Dodaj dług'}
-              </Button>
             </div>
           </div>
 
@@ -365,63 +326,6 @@ export default function App() {
               <p>• KEY: {supabaseAnonKey ? `Wykryto (${supabaseAnonKey.substring(0, 5)}...)` : 'BRAK'}</p>
               <p className="mt-2 italic opacity-70">Upewnij się, że plik .env znajduje się w: {`/Users/tomaszgt/Debt Crusher/.env`}</p>
             </div>
-          )}
-
-          {isAdding && (
-            <Card className="p-6 mb-6 border-emerald-500/30 bg-gray-800 animate-in fade-in slide-in-from-top-4">
-              <form onSubmit={handleAddDebt} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400 uppercase">Nazwa długu</label>
-                    <input
-                      required
-                      value={newDebt.name}
-                      onChange={e => setNewDebt({ ...newDebt, name: e.target.value })}
-                      className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none"
-                      placeholder="np. Pożyczka Vivus"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400 uppercase">Kwota (PLN)</label>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      value={newDebt.initial_amount}
-                      onChange={e => setNewDebt({ ...newDebt, initial_amount: e.target.value })}
-                      className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none"
-                      placeholder="np. 2500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400 uppercase">Kategoria</label>
-                    <select
-                      value={newDebt.category}
-                      onChange={e => setNewDebt({ ...newDebt, category: e.target.value })}
-                      className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none"
-                    >
-                      <option value="Chwilówka">Chwilówka</option>
-                      <option value="Prywatne">Prywatne</option>
-                      <option value="Firmowe">Firmowe</option>
-                      <option value="Pożyczka">Pożyczka</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400 uppercase">Notatka (opcjonalnie)</label>
-                    <input
-                      value={newDebt.note}
-                      onChange={e => setNewDebt({ ...newDebt, note: e.target.value })}
-                      className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none"
-                      placeholder="np. Spłać to natychmiast!"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button onClick={() => setIsAdding(false)} variant="secondary">Anuluj</Button>
-                  <Button type="submit">Dodaj do listy</Button>
-                </div>
-              </form>
-            </Card>
           )}
 
           {activeDebts.length === 0 && (
