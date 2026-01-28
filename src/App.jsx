@@ -161,19 +161,6 @@ export default function App() {
     fetchData();
   }, []);
 
-  const clearAllDebts = async () => {
-    if (!confirm('Czy na pewno chcesz usunąć WSZYSTKIE długi? Tego nie da się cofnąć.')) return;
-
-    setLoading(true);
-    if (supabase) {
-      const { error } = await supabase.from('debts').delete().neq('id', 0); // Delete all
-      if (error) console.error("Error clearing database:", error);
-    }
-
-    setDebts([]);
-    localStorage.removeItem('tomek_debts_v1');
-    setLoading(false);
-  };
 
   // Helper to save data
   const persistDebts = async (updatedDebts) => {
@@ -365,9 +352,6 @@ export default function App() {
               <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 hidden md:block">
                 Metoda Kuli Śnieżnej
               </span>
-              <Button onClick={clearAllDebts} variant="danger" size="sm">
-                Wyczyść wszystko
-              </Button>
               <Button onClick={() => setIsAdding(!isAdding)} variant="outline" size="sm">
                 {isAdding ? 'Anuluj' : '+ Dodaj dług'}
               </Button>
