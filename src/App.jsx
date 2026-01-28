@@ -78,8 +78,20 @@ const ProgressBar = ({ current, total, colorClass = "bg-emerald-500" }) => {
   );
 };
 
-// Initial data - empty on start
-const INITIAL_DEBTS = [];
+// Initial data - Real User Debts
+const INITIAL_DEBTS = [
+  { name: 'Vivigo', category: 'Chwilówka', initial_amount: 1458.60, current_amount: 1458.60, rate: '?', priority: 1, note: 'BARDZO WYSOKI (Mała kwota, zamknij to natychmiast)' },
+  { name: 'Santander', category: 'Prywatne', initial_amount: 2092.01, current_amount: 2092.01, rate: '?', priority: 2, note: 'WYSOKI (Łatwe do spłaty, uwalnia zdolność)' },
+  { name: 'Net Credit', category: 'Chwilówka', initial_amount: 4704.50, current_amount: 4704.50, rate: '?', priority: 3, note: 'WYSOKI (Prawdopodobnie wysokie koszty ukryte)' },
+  { name: 'Wonga', category: 'Pożyczka', initial_amount: 8153.46, current_amount: 8153.46, rate: '?', installment: 1012.55, priority: 4, note: 'WYSOKI (Ogromna rata w stosunku do długu!)' },
+  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 9245.08, current_amount: 9245.08, rate: '15%', priority: 5, note: 'ŚREDNI (Wysoki %, ale bankowy)' },
+  { name: 'Smartkey', category: 'Pożyczka', initial_amount: 12070.71, current_amount: 12070.71, rate: '?', installment: 574.85, priority: 6, note: 'ŚREDNI' },
+  { name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 15200.00, current_amount: 15200.00, rate: '12.10%', priority: 7, note: 'ŚREDNI (Pętla zadłużenia, spłacaj nadwyżkami)' },
+  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18191.51, current_amount: 18191.51, rate: '12.7%', priority: 8, note: 'ŚREDNI' },
+  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 18400.00, current_amount: 18400.00, rate: '10.7%', priority: 9, note: 'NISKI (Najniższy %, zostaw na koniec)' },
+  { name: 'mBank (Firma)', category: 'Firmowe', initial_amount: 23072.72, current_amount: 23072.72, rate: '10%', installment: 878.99, priority: 10, note: 'NISKI (Stabilna rata)' },
+  { name: 'mBank (Pryw.)', category: 'Prywatne', initial_amount: 50119.53, current_amount: 50119.53, rate: '9.88%', installment: 815.56, priority: 11, note: 'NISKI (Długi termin, niska rata)' },
+];
 
 export default function App() {
   const [debts, setDebts] = useState([]);
@@ -113,21 +125,32 @@ export default function App() {
             setDebts(data);
             localStorage.setItem('tomek_debts_v1', JSON.stringify(data));
           } else {
-            // If Supabase is empty, check localStorage
-            const localData = localStorage.getItem('tomek_debts_v1');
-            if (localData) {
-              setDebts(JSON.parse(localData));
-            } else {
-              setDebts([]);
+            // If Supabase is empty, check if we have something in INITIAL_DEBTS to seed
+            console.log('Supabase is empty, seeding your real data...');
+            const { data: inserted, error: insertError } = await supabase
+              .from('debts')
+              .insert(INITIAL_DEBTS)
+              .select();
+
+            if (insertError) {
+              console.error("Seeding error:", insertError);
+              // Local fallback if seeded failed
+              const localData = localStorage.getItem('tomek_debts_v1');
+              setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
+            } else if (inserted) {
+              console.log('Seeded successfully with your real data');
+              setDebts(inserted);
+              localStorage.setItem('tomek_debts_v1', JSON.stringify(inserted));
             }
           }
         } catch (e) {
           console.error("Supabase operation failed:", e);
+          const localData = localStorage.getItem('tomek_debts_v1');
+          setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
         }
       } else {
-        // Fallback to localStorage if Supabase failed or isn't configured
         const localData = localStorage.getItem('tomek_debts_v1');
-        setDebts(localData ? JSON.parse(localData) : []);
+        setDebts(localData ? JSON.parse(localData) : INITIAL_DEBTS);
       }
       setLoading(false);
     };
